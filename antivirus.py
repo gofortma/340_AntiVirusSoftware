@@ -3,6 +3,8 @@ import csv
 from pathlib import Path
 import hashlib
 import shutil
+import uuid
+from stat import S_IREAD, S_IRGRP, S_IROTH
 # TODO make a database with viruses
 # TODO make the python script read in the database of viruses
 # TODO make the python script look at system files
@@ -10,15 +12,22 @@ import shutil
 # TODO make the python script check files for the signatures of the viruses
 # TODO make the python script quarantine the files that have a virus signature
     # TODO decide what we mean by quarantine
-# To run do python3 antivirus.py ./signatures.csv . Quarantine
+# To run do python3 antivirus.py ./signatures.csv . .Quarantine
 signatureToVirus = dict()
 fileToHash = dict()
 dangerousFiles = []
-quarentineRestoreLocations = dict()
+quarantineRestoreInformation = dict()
+class fileRestoreInformation:
+    def __init__(self, originalPath, originalPermissions):
+        self.originalPath = originalPath
+        self.originalPermissions = originalPermissions
+    def __str__(self):
+        return f"{self.originalPath},{self.originalPermissions}"
 
 filepath = sys.argv[1]
 startingLocation = sys.argv[2]
 quarantineLocation = sys.argv[3]
+quarantinePath = Path(quarantineLocation)
 
 def readInSignatures(filepath):
     with open(filepath, "r") as signature_database:
@@ -51,20 +60,36 @@ def findViruses():
             dangerousFiles.append(file)
 
 findViruses()
+print("The dangerous files are " + str(dangerousFiles))
 
 def quarantineViruses():
+    i = 0
     for file in dangerousFiles:
-        fileInfo = Path.lstat(file)
-        print("The file info is " + str(fileInfo))
+        print("Beginning quarantine of dangerous file " + str(file))
+        #Need to assign the file a UUID maybe to avoid duplicates? In the quarantine bucket have a new name.
+        #Associate with the original name
+        virusFileId = uuid.uuid4().hex #This one is cyrytographically secure
+        fileInfo = file.lstat()
+        virusStore = fileRestoreInformation(file, fileInfo)
+        quarantineRestoreInformation[virusFileId] = virusStore
+        print("The virus UUID is " + virusFileId)
+        print("The virus restore information is " + str(virusStore))
+        newVirusPath = quarantinePath.joinpath(virusFileId)
+        trueVirusPath = shutil.move(file, newVirusPath)
+        print("The virus should not be located in " + str(newVirusPath))
+        trueVirusPath.chmod(S_IREAD|S_IRGRP|S_IROTH) #This turns on read only for Windows. For linux it should make the file have the proper permissions
+        
         # Path.chmod(file, 0o444) #This should be read only
-        #TODO backup old file permissions
-        #TODO backup old file locatoin
-        #TODO find a location in quarantine
-        #TODO associate quarantined file with old file location and permissions
-        #TODO make file read only
-        break
+        # filesPath = shutil.move(file, quarantineLocation)
+        # print("Maybe moved to " + str(filesPath))
+        # newNamesFile = Path.with_name(filesPath, virusFileId)
+        # Path.joinpath(quarantineLocation, virusFileId)
+        #TODO possibly make the file owned by a different account as well so the owner cannot restore their permissions
+        #TODO there may be more permissions possible for quarantining
         # shutil.move(file, quarantineLocation)
         # quarentineRestoreLocations[file] = 
         # fileToHash.pop(file)
 quarantineViruses()
+# for fileId, fileRestoreInfo in quarantineRestoreInformation.items():
+    # print("The virus restore information for item " + fileId + " is " + fileRestoreInfo)
 
