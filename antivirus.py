@@ -5,6 +5,7 @@ import hashlib
 import shutil
 import uuid
 from stat import S_IREAD, S_IRGRP, S_IROTH
+from pwd import getpwnam
 # TODO make a database with viruses
 # TODO make the python script read in the database of viruses
 # TODO make the python script look at system files
@@ -13,6 +14,9 @@ from stat import S_IREAD, S_IRGRP, S_IROTH
 # TODO make the python script quarantine the files that have a virus signature
     # TODO decide what we mean by quarantine
 # To run do python3 antivirus.py ./signatures.csv . .Quarantine
+user = "root"
+rootUid = getpwnam(user).pw_uid
+rootGid = getpwnam(user).pw_gid
 signatureToVirus = dict()
 fileToHash = dict()
 dangerousFiles = []
@@ -63,7 +67,6 @@ findViruses()
 print("The dangerous files are " + str(dangerousFiles))
 
 def quarantineViruses():
-    i = 0
     for file in dangerousFiles:
         print("Beginning quarantine of dangerous file " + str(file))
         #Need to assign the file a UUID maybe to avoid duplicates? In the quarantine bucket have a new name.
@@ -78,7 +81,7 @@ def quarantineViruses():
         trueVirusPath = shutil.move(file, newVirusPath)
         print("The virus should not be located in " + str(newVirusPath))
         trueVirusPath.chmod(S_IREAD|S_IRGRP|S_IROTH) #This turns on read only for Windows. For linux it should make the file have the proper permissions
-        
+        shutil.chown(trueVirusPath, rootUid, rootGid)
         # Path.chmod(file, 0o444) #This should be read only
         # filesPath = shutil.move(file, quarantineLocation)
         # print("Maybe moved to " + str(filesPath))
